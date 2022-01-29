@@ -1,8 +1,10 @@
-# Causality in Configurable Software Systems - Supplementary Material
+# Causality in Configurable Software Systems
 
-We provide the prototype implementation of FeatCause alongside with the data to reproduce the experiments from our evaluation.
+This is the repository of FeatCause, a prototypical implementation of the algorithms described in the ICSE'22 paper
 
-In order to reduce the trouble with dependencies, we provide a [Virtual Machine]() which has all python requirements installed and contains a working binary of [espresso](https://github.com/psksvp/espresso-ab-1.0).
+*Causality in Configurable Software Systems* by Clemens Dubslaff, Kallistos Weis, Christel Baier, and Sven Apel.
+
+The preprint of this paper is available at [ArXiv](https://arxiv.org/abs/2201.07280).
 
 ## Directory structure
 The supplementary material to reproduce our findings from the evaluation is organized in the following three main directories:
