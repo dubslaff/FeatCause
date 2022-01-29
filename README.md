@@ -2,8 +2,6 @@
 
 We provide the prototype implementation of FeatCause alongside with the data to reproduce the experiments from our evaluation.
 
-Additionally, we provide an **appendix.pdf** that contains proofs and additional connections we explored but had to be omitted from the main paper due to space constraints.
-
 In order to reduce the trouble with dependencies, we provide a [Virtual Machine]() which has all python requirements installed and contains a working binary of [espresso](https://github.com/psksvp/espresso-ab-1.0).
 
 ## Directory structure
@@ -84,8 +82,52 @@ Causes and blame are stored in subdirectories of _tmp_, for which their experime
 All statistical output, i.e., produced with the flags _-stat_ and _-tstat_, will be in a subdirectory of _tmp_, i.e., *statistic_files*.
 
 
-## Example
-Executing the command `python main.py examples/RWSPL/lrzip/lrzipPaper -i -b all -m -d -sani -s 1 -p -w` leads to the output:
+## Examples
+Executing the command `python main.py ../benchmark/examples/ProVeLines/minepump/minepump -v -i -s 12 -m -d` leads to the output:
+<details>
+<summary>Console Output</summary>
+
+```console
+--- FeatCause ---
+Feature model of examples/ProVeLines/minepump/minepump.fm: 128 configurations
+	PID: 45334
+	Number of Features: 11
+--- Time to read feature model:     0.0235s
+--- start iteration 12 ---
+--- Time to build effect BDD:     0.0142s
+28 effects
+--- Time to build BDD for valid non-effects:     0.0014 seconds
+100 valid non-effects
+Compute causes via prime implicants...
+O	Compute primes...
+O       Time for BDD PLA export:     0.0055s                
+O	Time for Espresso primes:     0.0083s
+O Atomic feature causes computed (7)                                            
+	And(High, Start, MethaneAlarm)
+	And(High, Command, ~Stop, MethaneSensor, ~MethaneQuery)
+	And(High, Start, Stop)
+	And(High, Start, MethaneSensor, ~MethaneQuery)
+	And(High, Low, Command, ~Stop)
+	And(High, Low, Start)
+	And(High, Command, ~Stop, MethaneAlarm)
+X	DLS [34 -> 21]: And(High, Or(And(Command, ~Stop, Or(Low, MethaneAlarm, And(MethaneSensor, ~MethaneQuery))), And(Start, Or(Low, Stop, MethaneAlarm, And(MethaneSensor, ~MethaneQuery)))))
+X Most general causes (3)
+X	And(High, Low, Start)
+X	And(High, Start, Stop)
+X	And(High, Start, MethaneAlarm)
+X	DLS [13 -> 7]: And(High, Start, Or(Low, Stop, MethaneAlarm))
+--- Time for atomic and most general causes:     0.0461s
+I 3-way interaction witnesses computed (3)
+	And(High, Start, MethaneAlarm)
+	And(High, Low, Start)
+	And(High, Start, Stop)
+------------- end iterations
+Total time for computation:     0.0882s
+```
+</details>
+
+
+Executing the command `python main.py ../benchmark/examples/RWSPL/lrzip/lrzipPaper -s 1 -i -b all -m -d -sani -p -w` leads to the output:
 <details>
 <summary>Console Output</summary>
 
