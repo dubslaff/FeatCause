@@ -14,7 +14,9 @@ In this directory, we provide the prototype of **FeatCause**, our algorithm to c
 
 - _main.py_ contains the major part of the implementation
 - *fm\_parser.py*, *causality.py*, *utils.py* contain helping functionality for **FeatCause**
-- *espresso*, *espresso-osx* are precompiled binaries of the two-level minimizer **espresso** for Linux and macos operating systems (main.py invokes "espresso", please rename the file accordingly when on a macos system -- for Windows users, please compile [espresso](https://github.com/psksvp/espresso-ab-1.0) by your own)
+- *espresso*, *espresso-osx* are precompiled binaries of the two-level minimizer **espresso** for Linux and macOS operating systems
+
+Since main.py invokes "./espresso", please ensure that espresso is in the folder where you run the tool from (e.g., "tool"). If on macOS and you want to use the precompiled espresso binary, please rename "espresso-osx" to "espresso" first. On Windows systems, please compile [espresso](https://github.com/psksvp/espresso-ab-1.0) by your own.
 
 
 #### _main.py_
@@ -47,7 +49,7 @@ One can choose between different options to run our prototype:
  - *buildEvaluationTable.py* is a script to create a table for descriptive statistics of all experiments (as presented in the paper)
 
 ### benchmark
-Contains a script (_evaluation\_runner.py_) to execute all experimentes as well as an archive of examples (_examples.zip_) which contains all data that are used in the paper to evaluate our approach.
+Contains a script (_evaluation\_runner.py_) to execute all experiments as well as an archive of examples (_examples.zip_) which contains all data that are used in the paper to evaluate our approach.
 
 Flags for *evaluation_runner.py*:
  - _-c_ to check if all experiments are found.
@@ -61,11 +63,11 @@ To execute the runner, espresso has to be located in the same directory as the *
 ## Requirements
 
 ### espresso
-We provide binaries of espresso compiled for macos and Linux, compiled from the following [sources](https://github.com/psksvp/espresso-ab-1.0)
+We provide binaries of espresso compiled for macOS and Linux, compiled from the following [sources](https://github.com/psksvp/espresso-ab-1.0)
 
 ### Python
 To run our prototype the following dependencies need to be provided, which are installable in the standard way via pip:
- - pyeda
+ - pyEDA
  - pandas
 
 ## Creating own Case-Studies
