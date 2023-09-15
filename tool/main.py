@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 import time
+import random
 import pandas as pd
 from pathlib import Path
 
@@ -68,12 +69,15 @@ base_group.add_argument("-fmt", "--fmtype", default="DNF", help="type of the fea
 base_group.add_argument("-c", "--closevalid", action="store_true", help="determine feature model by (effects U non-effects)")
 base_group.add_argument("-n", "--negate", action="store_true", help="switch role of effects/non-effects")
 base_group.add_argument("-na", "--noatomic", action="store_true", help="do not compute atomic causes")
+base_group.add_argument("-inc", "--incnum", default="0", help="incremental adding valid configurations to effects/non-effects [number of steps, 0=no]")
 
 expl_group = arg_parser.add_argument_group("explication parameters")
 expl_group.add_argument("-d", "--distribute", action="store_true", help="minimize with distribution law")
 expl_group.add_argument("-m", "--minimize", action="store_true", help="compute most general cause covers")
 expl_group.add_argument("-e", "--espresso", default="no", help="compute cause-effect covers with Espresso heuristics [fast, standard, signature, qm]")
 expl_group.add_argument("-b", "--blame", default="no", help="compute blames [pfblame, fblame, cblame, all]")
+expl_group.add_argument("-u", "--uncertainty", action="store_true", help="include uncertainty")
+expl_group.add_argument("-bdd", "--bdd", action="store_true", help="return results also in BDD representation")
 expl_group.add_argument("-w", "--weight", action="store_true", help="compute cause weights")
 expl_group.add_argument("-i", "--interactions", action="store_true", help="compute interaction witnesses")
 
@@ -85,6 +89,7 @@ sanity_group.add_argument("-pyp", "--pyprimes", action="store_true", help="use o
 info_group = arg_parser.add_argument_group('info and statistics parameters')
 info_group.add_argument("-v", "--verbose", action="store_true", help="print out verbose information")
 info_group.add_argument("-p", "--print", action="store_true", help="print feature causes results")
+expl_group.add_argument("-pdf", "--pdf", action="store_true", help="translate results (BDDs) into PDF")
 info_group.add_argument("-stat", "--statistics", action="store_true", help="write statistics to statistics file; -m and -d needed.")
 info_group.add_argument("-tstat", "--timestatistics", action="store_true", help="write time statistics to statistics file; -d not needed")
 args = arg_parser.parse_args()
@@ -95,6 +100,9 @@ fm_type = args.fmtype
 blame_type = args.blame
 weight_flag = args.weight
 minimize_flag = args.minimize
+inc_number = int(args.incnum)
+bdd_flag = args.bdd
+pdf_flag = args.pdf
 interaction_flag = args.interactions
 noatomic_flag = args.noatomic & ~(minimize_flag | weight_flag | interaction_flag)
 if blame_type != "no" and noatomic_flag:
@@ -114,7 +122,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
 # paths to the expermiment and statistic gathering results
-tmp_path = "tmp/" + experiment.split('/')[-1]
+tmp_path = "tmp/" + str(os.getpid()) + "_" + experiment.split('/')[-1]
 statistic_prefix_path = "tmp/statistic_files"
 if not os.path.exists(tmp_path):
 	os.makedirs(tmp_path)
@@ -225,9 +233,10 @@ while os.path.isfile(experiment + "." + str(i)):
 		b_effects = ~b_effects
 	if not noneffects_flag:
 		b_effects = b_effects & b_valid_feats
+	n_effects = utils.get_sat_num(b_effects, feats)
 	if verbose_flag:
 		logger.info(f"--- Time to build effect BDD: {time.time() - start_time:10.4f}s")
-		logger.info(str(utils.get_sat_num(b_effects, feats)) + " effects")
+		logger.info(str(n_effects) + " effects")
 		if sanity_flag:
 			logger.info(f"effect feats-univ: {set(feats.values()) - univ}, univ-feats: {univ - set(feats.values())}")
 
@@ -242,21 +251,28 @@ while os.path.isfile(experiment + "." + str(i)):
 		b_neffects = b_valid_feats & ~b_effects
 	if verbose_flag:
 		logger.info("--- Time to build BDD for valid non-effects: " + "{:10.4f}".format(time.time() - start_time) + " seconds")
-
+	n_neffects = utils.get_sat_num(b_neffects, feats)
 	if verbose_flag:
-		logger.info(str(utils.get_sat_num(b_neffects, feats)) + " valid non-effects")
+		logger.info(str(n_neffects) + " valid non-effects")
 		if sanity_flag:
 			logger.info("valid non-effects ... feats-univ: " + str(set(feats.values()) - univ) + " univ-feats: " + str(univ - set(feats.values())))
 			if not noneffects_flag:
-				logger.info("sanity check: " + str(utils.get_sat_num(b_effects, feats)) + " valid effects")
+				logger.info("sanity check: " + str(n_effects) + " valid effects")
 			logger.info("sanity check (b_ne & b_e is zero): " + str((b_neffects & b_effects).is_zero()))
 	if args.statistics:
 		statistics['NumberFeatures'].append(len(feats))
 	if args.statistics and new_stats:
-		statistics['EffectSetSize'].append(utils.get_sat_num(b_effects, feats))
-		statistics['NumberValidConfigurations'].append(utils.get_sat_num(b_effects, feats) + utils.get_sat_num(b_neffects, feats))
+		statistics['EffectSetSize'].append(n_effects)
+		statistics['NumberValidConfigurations'].append(n_effects + n_neffects)
 		statistics['ExperimentID'].append(i)
 		statistics['ExperimentName'].append(experiment.split('/')[-1])
+
+	if args.uncertainty:
+		# read uncertainty bdd
+		filename_ueffects = experiment + "UncertainConfigurations." + str(i)
+		b_ueffects, _ = fm_parser.gen_bdd_dnf_file(filename_ueffects, feats)
+		b_effects &= ~b_ueffects
+		b_neffects &= ~b_ueffects
 
 	# variant with primes
 	iteration_start_time = time.time()
@@ -265,22 +281,121 @@ while os.path.isfile(experiment + "." + str(i)):
 
 	E_causes = set()
 	E_mcauses = set()
-	if minimize_flag:
-		E_causes, E_mcauses = causality.get_causes(b_effects, b_neffects, feats, tmp_path, expr=pyprimes_flag)
+
+	### stepwise adding of knowledge about effect/non-effect in valid feats (for precauses)
+	if inc_number > 0: # compute stepwise causes from shuffled valid feats
+		if n_effects > 0 and n_neffects > 0: # if there can be causes at all
+			E_effects = list(map(utils.sat_dict_to_expr, utils.get_all_sat(b_effects, set(feats.values()))))
+			E_neffects = list(map(utils.sat_dict_to_expr, utils.get_all_sat(b_neffects, set(feats.values()))))
+			fscores = [0] * (n_effects+n_neffects)
+			precisions = [0] * (n_effects+n_neffects)
+			print("Start incremental computation for", i, "with", n_effects, n_neffects)
+			for j in range(inc_number):
+				print(j, end=".")
+				# generate shuffled list of effects and initial BDD
+				random.shuffle(E_effects)
+				ei = 0
+				bi_effects = expr2bdd(expr(0)) # set initial BDD to false
+				# generate shuffled list of non-effects and initial BDD
+				random.shuffle(E_neffects)
+				nei = 1
+				bi_neffects = expr2bdd(E_neffects[0]) # pick the first non-effect (to have at least one counterfactual)
+				# with open(f"{tmp_path}/inclist_{j}.{i}", "w") as f: # for reproducibility: add order
+				# 	f.write("\n".join(map(str, E_effects)) + "\n" + "\n".join(map(str, E_neffects)))
+				
+				# start incremental session
+				while ei+nei < n_effects+n_neffects:
+					# add new sample
+					if ei/nei < n_effects/n_neffects and ei < n_effects: # ratio less for effects, add effect
+						bi_effects |= expr2bdd(E_effects[ei])
+						ei += 1
+					else: # otherwise add counterfactual
+						bi_neffects |= expr2bdd(E_neffects[nei])
+						nei += 1
+
+					# E_causes, E_mcauses = causality.get_ternary_causes(bi_effects, bi_neffects, b_valid_feats, feats, tmp_path, expr=pyprimes_flag, minimization=minimize_flag)
+					E_causes, E_mcauses = causality.get_causes(bi_effects, bi_neffects, feats, tmp_path, expr=pyprimes_flag, minimization=minimize_flag)
+					# print([list(x)[0] for x in E_mcauses])
+					# compute most certain covering -- sort by ratio uncertain/covered effects
+					b_causes = expr2bdd(expr(0))
+					mprecauses = list()
+					while not (bi_effects & ~b_causes).is_zero():
+						clist = list()
+						for e_c in [list(x)[0] for x in E_mcauses]:
+							b_c = expr2bdd(e_c)
+							b_add = b_c & bi_effects & ~b_causes
+							if not b_add.is_zero(): # add e_c as candidate to cover more incremental effects
+								# covered_effects = utils.get_sat_num(b_c & (bi_effects | b_causes | ~b_valid_feats), feats)
+								# hard number of additionally covered effects -- utility
+								utility_ieffects = utils.get_sat_num(b_add, feats)
+								# additional effects to be assumed -- costs
+								cost_ieffects = utils.get_sat_num(b_c & (b_valid_feats & ~bi_effects & ~b_causes), feats)
+								# covered configs with already added precauses as effects
+								# covered_configs = utils.get_sat_num(b_c & (bi_effects | b_causes | ~b_valid_feats), feats)
+								if isinstance(e_c, AndOp) and e_c.depth == 1:
+									small = len(e_c.xs)
+								else:
+									small = 1
+								# covered possible effects
+								# covered_peffects = utils.get_sat_num(b_c & b_valid_feats, feats) /(covered_peffects+0.0001)
+								clist.append((e_c,utility_ieffects/(cost_ieffects+0.0001),small))
+						clist.sort(key=lambda a: a[2],reverse=False) # first sort on most covered effects
+						clist.sort(key=lambda a: a[1],reverse=True) # then sort on most certain
+						
+						mprecauses.append(clist[0][0]) # add first cause expressions
+						b_causes |= expr2bdd(clist[0][0]) # add covered effects to cover
+					# print(mprecauses)
+
+					# fscore = 2TP / (2TP + FP + FN)
+					tp = utils.get_sat_num(b_causes & b_effects, feats)
+					fp = utils.get_sat_num(b_causes & b_neffects, feats)
+					fn = utils.get_sat_num(~b_causes & b_effects, feats)
+					# print(ei, nei, 'fscore:', str(2*tp/(2*tp+fp+fn))[:5], 'precision:', str(tp/(tp+fp))[:5])
+					fscores[ei+nei-1] += (2*tp/(2*tp+fp+fn))/inc_number
+					precisions[ei+nei-1] += (tp/(tp+fp))/inc_number
+			# write out the average fscore
+			with open(f"{tmp_path}/fscore.{i}", "w") as ff:
+				for j in range(n_effects+n_neffects):
+					ff.write(f"{j}\t{fscores[j]}\n")
+			# write out the average precision
+			with open(f"{tmp_path}/precision.{i}", "w") as fp:
+				for j in range(n_effects+n_neffects):
+					fp.write(f"{j}\t{precisions[j]}\n")
+		
 	elif not noatomic_flag:
-		E_causes, _ = causality.get_causes(b_effects, b_neffects, feats, tmp_path, expr=pyprimes_flag, minimization=False)
+		E_causes, E_mcauses = causality.get_causes(b_effects, b_neffects, feats, tmp_path, expr=pyprimes_flag, minimization=minimize_flag)
+
+	if bdd_flag:
+		b_causes = expr2bdd(expr(0))
+		for e_c in E_causes:
+			b_causes |= expr2bdd(e_c)
+		with open(f"{tmp_path}/cause_bdd{i}.dot", "w") as f:
+			f.write(b_causes.to_dot())
+		if pdf_flag:
+			os.system(f"dot -Tpdf {tmp_path}/cause_bdd{i}.dot > {tmp_path}/cause_bdd{i}.pdf")
+		if minimize_flag:
+			j = 0
+			for E_mc in E_mcauses:
+				b_mcauses = expr2bdd(expr(0))
+				for e_c in E_mc:
+					b_mcauses |= expr2bdd(e_c)
+				with open(f"{tmp_path}/mcause_bdd{i}_{j}.dot", "w") as f:
+					f.write(b_mcauses.to_dot())
+				if pdf_flag:
+					os.system(f"dot -Tpdf {tmp_path}/mcause_bdd{i}_{j}.dot > {tmp_path}/mcause_bdd{i}_{j}.pdf")
+				j += 1
 
 	B_causes = dict()
 	if blame_type == "cblame" or blame_type == "all":
 		logger.info("Compute partial blame of causes...")
 		for e_c in E_causes:
-			blame = causality.get_partial_blame(e_c, E_causes, b_effects & b_valid_feats, b_neffects & b_valid_feats, set(feats.values()))
+			blame = causality.get_partial_blame(e_c, E_causes, b_effects, b_neffects, set(feats.values()))
 			B_causes[e_c] = blame
 
 	W_causes = dict()
 	if weight_flag:
 		logger.info("Compute weight of causes...")
-		W_causes = causality.get_cause_weights(E_causes, b_effects & b_valid_feats, feats)
+		W_causes = causality.get_cause_weights(E_causes, b_effects, feats)
 
 	if not noatomic_flag:
 		print_dnf(E_causes, "O Atomic feature causes", B_causes, W_causes)
@@ -369,7 +484,7 @@ while os.path.isfile(experiment + "." + str(i)):
 				blame_candidates = fm_parser.read_fr_file(experiment + ".fr")
 				for candidate in blame_candidates:
 					e_l = expr("And(" + str(candidate) + ")")
-					partial_blame = causality.get_partial_blame(e_l, E_causes, b_effects & b_valid_feats, b_neffects & b_valid_feats, set(feats.values()))
+					partial_blame = causality.get_partial_blame(e_l, E_causes, b_effects, b_neffects, set(feats.values()))
 					with open(tmp_path + "/partial_blame.csv", "a") as f:
 						f.write(str(candidate) + "\t" + str(partial_blame) + "\n")
 						print(f"R {candidate}: \t {print_num(partial_blame)}")
@@ -380,9 +495,9 @@ while os.path.isfile(experiment + "." + str(i)):
 					istr = "# nr"
 					r0 = "none"
 					for x in sorted(list(feats.values()), key=str):
-						r0 = causality.get_partial_blame(expr(~x), E_causes, b_effects & b_valid_feats, b_neffects & b_valid_feats, set(feats.values()))
+						r0 = causality.get_partial_blame(expr(~x), E_causes, b_effects, b_neffects, set(feats.values()))
 						rstr += "\t" + str(r0)
-						r1 = causality.get_partial_blame(expr(x), E_causes, b_effects & b_valid_feats, b_neffects & b_valid_feats, set(feats.values()))
+						r1 = causality.get_partial_blame(expr(x), E_causes, b_effects, b_neffects, set(feats.values()))
 						rstr += "\t" + str(r1)
 						if start_iteration:
 							istr += "\t" + str(~x) + "\t" + str(x)

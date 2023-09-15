@@ -1,10 +1,13 @@
-# Causality in Configurable Software Systems
+# Feature Causality
 
 This is the repository of FeatCause, a prototypical implementation of the algorithms described in the ICSE'22 paper
 
 *Causality in Configurable Software Systems* by Clemens Dubslaff, Kallistos Weis, Christel Baier, and Sven Apel.
 
 The preprint of this paper is available at [ArXiv](https://arxiv.org/abs/2201.07280).
+
+Compared to the version used in this paper, the implementation has 
+been extended with methods to reason about uncertainties in effect sets.
 
 ## Directory structure
 The supplementary material to reproduce our findings from the evaluation is organized in the following three main directories:
@@ -34,6 +37,7 @@ One can choose between different options to run our prototype:
  - _-b_ [pfblame, fblame, cblame, all] determins which blame shall be computed, pfblame for the blame of partial configurations, fblame for the blame of single features, and cblame for the blame of causes
  - _-w_ computes the weights of causes
  - _-i_ enables computation of minimal t-way interaction witnesses
+ - _-inc_ enables the incremental computation of uncertain effect sets (in combination with -m)
 
  - _-sani_ performs sanity checks during computation
 
@@ -56,6 +60,7 @@ Flags for *evaluation_runner.py*:
  - _-r_ to run all experiments
  - _-t_ to get run time measurements for all experiments, can only be used after running all experiments once
  - _-m_ to run multiple experiments in parallel, one for each thread of the system
+ - _-f_ to run fscore computations for uncertain effect sets
 
 To execute the runner, espresso has to be located in the same directory as the *evaluation_runner.py*.
 **Make sure to unzip *examples.zip*** before you run the *evaluation_runner.py*.

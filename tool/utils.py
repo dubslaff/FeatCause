@@ -228,7 +228,7 @@ def espresso_bdd(b_fun, b_dc, umap, tmp_path, type="standard"):
 	# generate PLA from BDD
 	pla_bdd(inf, b_fun, b_dc, umap)
 
-	print(f"O\tTime for BDD PLA export: {time.time() - start_time:10.4f}s")
+	# print(f"O\tTime for BDD PLA export: {time.time() - start_time:10.4f}s")
 	start_time = time.time()
 	with open(esf, "w") as fout:
 		if type == "qm":
@@ -242,7 +242,7 @@ def espresso_bdd(b_fun, b_dc, umap, tmp_path, type="standard"):
 		else:
 			subprocess.Popen(["./espresso", "-Dprimes", "-t", inf], stdout=fout).wait()
 	es_list = espr2exprlist(esf, umap)
-	print(f"O\tTime for Espresso {type}: {time.time() - start_time:10.4f}s")
+	# print(f"O\tTime for Espresso {type}: {time.time() - start_time:10.4f}s")
 	return es_list
 
 def espr2exprlist(fname, umap):

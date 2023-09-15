@@ -26,11 +26,74 @@ def get_causes(b_e, b_ne, umap, tmp_path, expr=False, minimization=True):
 	b = ~b_ne
 
 	if not b.is_zero() and not b.is_one():
-		print("O\tCompute primes...")
+		# print("O\tCompute primes...")
 		if expr:
 			primes = utils.get_expr_primes(b)
 		else:
 			primes = utils.espresso_bdd(b, None, umap, tmp_path, type="primes")
+
+		# primes.sort(key=utils.get_andsize, reverse=False)
+		j = 0
+		start_time = time.time()
+		for e_a in primes: # go through all the prime implicants and add if there is a valid evaluation
+			b_a = expr2bdd(e_a)
+			b_ea = b_a & b_e
+			if j > 200:
+				print(f"{j:5}/{len(primes)} primes checked, {len(B_clist):5}/{len(E_pfcauses):5} mins/atomics [{time.time() - start_time:10.4f}s]", end="\r")
+				if j%int(len(primes)/20+200) - 199 == 1:
+					print() # make a log permanent to compare
+			j += 1
+			if not b_ea.is_zero():
+				E_pfcauses.add(e_a) # add cause to list
+				if minimization:
+					n_ea = utils.get_sat_num(b_ea, umap)
+					# check whether covered - go through equivalence classes
+					for i in reversed(range(len(B_clist))):
+						b_b = B_clist[i][0]
+						b_eb = B_eb[i]
+						n_eb = N_eb[i]
+						if (n_ea <= n_eb) and (b_ea & ~b_b).is_zero(): # b_a covered by existing b_b
+							# if len(b_b.support) < len(b_a.support): # and existing are smaller -> break
+							# 	break
+							# if len(b_b.support) == len(b_a.support) and (n_ea == n_eb) and ((b_eb & ~b_a).is_zero()):
+							if (n_ea == n_eb) and ((b_eb & ~b_a).is_zero()):
+								# b_a covers b_b -> add to equivalence class
+								B_clist[i].append(b_a)
+							break
+						elif (n_ea >= n_eb) and ((b_eb & ~b_a).is_zero()): # if b_b is covered by b_a -> remove b_b
+							B_clist.pop(i)
+							B_eb.pop(i)
+							N_eb.pop(i)
+					else:
+						B_clist.append([b_a])
+						B_eb.append(b_ea)
+						N_eb.append(n_ea)
+	print(80*" ", end="\r") # dirty flush line
+	for C in B_clist:
+		c = set()
+		for b in C:
+			c.add(bdd2expr(b))
+		E_mpfcauses.add(frozenset(c))
+	return E_pfcauses, E_mpfcauses
+
+def get_ternary_causes(b_e, b_ne, b_all, umap, tmp_path, expr=False, minimization=True):
+	""" takes BDDs {b_e} for effects, non-effects {b_ne}, and valids {b_all} and returns a 
+		set of causes as Boolean formulas using prime-implicant computation
+	"""
+	E_pfcauses = set()
+	E_mpfcauses = set()
+	B_clist = list()
+	B_eb = list()
+	N_eb = list()
+
+	b = ~b_all | b_e
+
+	if not b.is_zero() and not b.is_one():
+		# print("O\tCompute primes...")
+		if expr:
+			primes = utils.get_expr_primes(b)
+		else:
+			primes = utils.espresso_bdd(b, b_all & ~b_e & ~b_ne, umap, tmp_path, type="primes")
 
 		# primes.sort(key=utils.get_andsize, reverse=False)
 		j = 0
