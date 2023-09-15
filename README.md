@@ -17,7 +17,7 @@ In this directory, we provide the prototype of **FeatCause**, our algorithm to c
 
 - _main.py_ contains the major part of the implementation
 - *fm\_parser.py*, *causality.py*, *utils.py* contain helping functionality for **FeatCause**
-- *espresso*, *espresso-osx* are precompiled binaries of the two-level minimizer **espresso** for Linux and macOS operating systems
+- *espresso*, *espresso-macos-x86*, *espresso-macos-arm* are precompiled binaries of the two-level minimizer **espresso** for Linux and macOS operating systems
 
 Since main.py invokes "./espresso", please ensure that espresso is in the folder where you run the tool from (e.g., "tool"). If on macOS and you want to use the precompiled espresso binary, please rename "espresso-osx" to "espresso" first. On Windows systems, please compile [espresso](https://github.com/psksvp/espresso-ab-1.0) by your own.
 
